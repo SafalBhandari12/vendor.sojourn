@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { HotelAPI, createRoomFormData, Room } from "@/lib/hotelAPI";
+import Image from "next/image";
 import {
   Card,
   CardContent,
@@ -56,21 +57,21 @@ export default function RoomsPage() {
   });
   const { showToast } = useToast();
 
-  useEffect(() => {
-    fetchRooms();
-  }, []);
-
-  const fetchRooms = async () => {
+  const fetchRooms = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await HotelAPI.getVendorRooms();
       setRooms(response.data);
-    } catch (error: any) {
-      showToast(error.message || "Failed to fetch rooms", "error");
+    } catch (error: unknown) {
+      showToast((error as Error).message || "Failed to fetch rooms", "error");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchRooms();
+  }, [fetchRooms]);
 
   const resetForm = () => {
     setFormData({
@@ -156,8 +157,8 @@ export default function RoomsPage() {
 
       resetForm();
       fetchRooms();
-    } catch (error: any) {
-      showToast(error.message || "Failed to save room", "error");
+    } catch (error: unknown) {
+      showToast((error as Error).message || "Failed to save room", "error");
     } finally {
       setIsLoading(false);
     }
@@ -170,8 +171,8 @@ export default function RoomsPage() {
       await HotelAPI.deleteRoom(roomId);
       showToast("Room deleted successfully!", "success");
       fetchRooms();
-    } catch (error: any) {
-      showToast(error.message || "Failed to delete room", "error");
+    } catch (error: unknown) {
+      showToast((error as Error).message || "Failed to delete room", "error");
     }
   };
 
@@ -180,8 +181,11 @@ export default function RoomsPage() {
       await HotelAPI.toggleRoomAvailability(roomId);
       showToast("Room availability updated!", "success");
       fetchRooms();
-    } catch (error: any) {
-      showToast(error.message || "Failed to update room availability", "error");
+    } catch (error: unknown) {
+      showToast(
+        (error as Error).message || "Failed to update room availability",
+        "error"
+      );
     }
   };
 
@@ -400,12 +404,14 @@ export default function RoomsPage() {
               <div className='space-y-3'>
                 {/* Room Image */}
                 {room.images && room.images.length > 0 && (
-                  <img
+                  <Image
                     src={
                       room.images.find((img) => img.isPrimary)?.thumbnailUrl ||
                       room.images[0].imageUrl
                     }
                     alt={`${room.roomType} ${room.roomNumber}`}
+                    width={300}
+                    height={128}
                     className='w-full h-32 object-cover rounded-lg'
                   />
                 )}

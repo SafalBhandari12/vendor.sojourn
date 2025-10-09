@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { HotelAPI, createHotelFormData } from "@/lib/hotelAPI";
+import { HotelAPI, createHotelFormData, HotelProfile } from "@/lib/hotelAPI";
+import Image from "next/image";
 import {
   Card,
   CardContent,
@@ -41,7 +42,7 @@ const AMENITIES_OPTIONS = [
 
 export default function HotelProfilePage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [hotelProfile, setHotelProfile] = useState<any>(null);
+  const [hotelProfile, setHotelProfile] = useState<HotelProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imageDescriptions, setImageDescriptions] = useState<string[]>([]);
@@ -73,7 +74,7 @@ export default function HotelProfilePage() {
         checkInTime: response.data.checkInTime || "14:00",
         checkOutTime: response.data.checkOutTime || "11:00",
       });
-    } catch (error) {
+    } catch {
       console.log("No hotel profile found");
       setIsEditing(true); // Enable editing mode for new profile
     }
@@ -131,8 +132,11 @@ export default function HotelProfilePage() {
       setIsEditing(false);
       setSelectedImages([]);
       setImageDescriptions([]);
-    } catch (error: any) {
-      showToast(error.message || "Failed to save hotel profile", "error");
+    } catch (error: unknown) {
+      showToast(
+        (error as Error).message || "Failed to save hotel profile",
+        "error"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -145,8 +149,8 @@ export default function HotelProfilePage() {
       await HotelAPI.deleteHotelImage(imageId);
       showToast("Image deleted successfully!", "success");
       fetchHotelProfile(); // Refresh data
-    } catch (error: any) {
-      showToast(error.message || "Failed to delete image", "error");
+    } catch (error: unknown) {
+      showToast((error as Error).message || "Failed to delete image", "error");
     }
   };
 
@@ -252,41 +256,51 @@ export default function HotelProfilePage() {
               </CardHeader>
               <CardContent>
                 <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-                  {hotelProfile.images.map((image: any) => (
-                    <div key={image.id} className='relative group'>
-                      <img
-                        src={image.thumbnailUrl || image.imageUrl}
-                        alt={image.description}
-                        className='w-full h-48 object-cover rounded-lg'
-                      />
-                      {image.isPrimary && (
-                        <span className='absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs'>
-                          Primary
-                        </span>
-                      )}
-                      <button
-                        onClick={() => handleDeleteImage(image.id)}
-                        className='absolute top-2 right-2 bg-red-600 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity'
-                      >
-                        <svg
-                          className='w-4 h-4'
-                          fill='none'
-                          stroke='currentColor'
-                          viewBox='0 0 24 24'
+                  {hotelProfile.images.map(
+                    (image: {
+                      id: string;
+                      imageUrl: string;
+                      thumbnailUrl?: string;
+                      description: string;
+                      isPrimary: boolean;
+                    }) => (
+                      <div key={image.id} className='relative group'>
+                        <Image
+                          src={image.thumbnailUrl || image.imageUrl}
+                          alt={image.description}
+                          width={300}
+                          height={200}
+                          className='w-full h-48 object-cover rounded-lg'
+                        />
+                        {image.isPrimary && (
+                          <span className='absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs'>
+                            Primary
+                          </span>
+                        )}
+                        <button
+                          onClick={() => handleDeleteImage(image.id)}
+                          className='absolute top-2 right-2 bg-red-600 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity'
                         >
-                          <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            strokeWidth={2}
-                            d='M6 18L18 6M6 6l12 12'
-                          />
-                        </svg>
-                      </button>
-                      <p className='text-sm text-gray-600 mt-2'>
-                        {image.description}
-                      </p>
-                    </div>
-                  ))}
+                          <svg
+                            className='w-4 h-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M6 18L18 6M6 6l12 12'
+                            />
+                          </svg>
+                        </button>
+                        <p className='text-sm text-gray-600 mt-2'>
+                          {image.description}
+                        </p>
+                      </div>
+                    )
+                  )}
                 </div>
               </CardContent>
             </Card>

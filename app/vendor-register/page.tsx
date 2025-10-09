@@ -12,7 +12,6 @@ import {
   Label,
   Button,
   Textarea,
-  Select,
 } from "@/components/ui";
 import { useToast } from "@/contexts/ToastContext";
 import { useRouter } from "next/navigation";
@@ -132,10 +131,11 @@ export default function VendorRegistrationPage() {
         "success"
       );
       router.push("/vendor-status");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Vendor registration error:", error);
 
-      let errorMessage = error.message || "Failed to submit vendor application";
+      let errorMessage =
+        (error as Error).message || "Failed to submit vendor application";
 
       // Provide more specific error messages
       if (
@@ -255,8 +255,8 @@ export default function VendorRegistrationPage() {
           {user.role !== "CUSTOMER" && (
             <div className='mt-2 p-3 bg-yellow-100 border border-yellow-300 rounded-md'>
               <p className='text-sm text-yellow-800'>
-                ⚠️ Note: Your current role is "{user.role}". Vendor registration
-                typically requires "CUSTOMER" role.
+                ⚠️ Note: Your current role is &quot;{user.role}&quot;. Vendor
+                registration typically requires &quot;CUSTOMER&quot; role.
               </p>
             </div>
           )}

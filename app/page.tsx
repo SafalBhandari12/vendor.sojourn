@@ -140,7 +140,7 @@ export default function Home() {
                   </h3>
                   <p className='text-sm text-yellow-700 mb-4'>
                     This portal is designed for hotel vendors. Your account role
-                    is "{user?.role}".
+                    is &quot;{user?.role}&quot;.
                   </p>
                   <div className='space-y-2'>
                     <Link href='/vendor-status'>

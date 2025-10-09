@@ -85,7 +85,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
             </h2>
             <p className='text-gray-600 mb-6'>
               This dashboard is only accessible to vendors. Your account role is
-              "{user.role}".
+              &quot;{user.role}&quot;.
             </p>
             <p className='text-sm text-gray-500 mb-6'>
               Please contact support if you believe this is an error, or sign up

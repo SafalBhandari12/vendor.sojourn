@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { HotelAPI, HotelProfile } from "@/lib/hotelAPI";
 import {
@@ -40,11 +40,7 @@ export default function DashboardPage() {
   });
   const { showToast } = useToast();
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setIsLoading(true);
 
@@ -64,21 +60,24 @@ export default function DashboardPage() {
 
         // Calculate stats
         const availableRooms = rooms.filter(
-          (room: any) => room.isAvailable
+          (room: { isAvailable: boolean }) => room.isAvailable
         ).length;
         const occupiedRooms = rooms.length - availableRooms;
         const pendingBookings = bookings.filter(
-          (booking: any) => booking.status === "PENDING"
+          (booking: { status: string }) => booking.status === "PENDING"
         ).length;
         const confirmedBookings = bookings.filter(
-          (booking: any) => booking.status === "CONFIRMED"
+          (booking: { status: string }) => booking.status === "CONFIRMED"
         ).length;
 
         // Calculate revenue (assuming bookings have totalAmount)
         const totalRevenue = bookings
-          .filter((booking: any) => booking.status === "CONFIRMED")
+          .filter(
+            (booking: { status: string }) => booking.status === "CONFIRMED"
+          )
           .reduce(
-            (sum: number, booking: any) => sum + (booking.totalAmount || 0),
+            (sum: number, booking: { totalAmount?: number }) =>
+              sum + (booking.totalAmount || 0),
             0
           );
 
@@ -86,7 +85,7 @@ export default function DashboardPage() {
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
         const monthlyRevenue = bookings
-          .filter((booking: any) => {
+          .filter((booking: { status: string; createdAt: string }) => {
             const bookingDate = new Date(booking.createdAt);
             return (
               booking.status === "CONFIRMED" &&
@@ -95,7 +94,8 @@ export default function DashboardPage() {
             );
           })
           .reduce(
-            (sum: number, booking: any) => sum + (booking.totalAmount || 0),
+            (sum: number, booking: { totalAmount?: number }) =>
+              sum + (booking.totalAmount || 0),
             0
           );
 
@@ -109,16 +109,20 @@ export default function DashboardPage() {
           totalRevenue,
           monthlyRevenue,
         });
-      } catch (error) {
+      } catch {
         // Hotel profile doesn't exist yet
         setHotelProfile(null);
       }
-    } catch (error: any) {
+    } catch {
       showToast("Failed to load dashboard data", "error");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   if (isLoading) {
     return (
@@ -160,7 +164,7 @@ export default function DashboardPage() {
             {hotelProfile.hotelName}
           </h2>
           <p className='text-sm text-gray-600'>
-            {hotelProfile.vendor.businessAddress}
+            {hotelProfile.vendor?.businessAddress || "N/A"}
           </p>
         </div>
       </div>
@@ -221,7 +225,7 @@ export default function DashboardPage() {
               ₹{stats.monthlyRevenue.toLocaleString()}
             </div>
             <p className='text-xs text-muted-foreground'>
-              This month's earnings
+              This month&apos;s earnings
             </p>
           </CardContent>
         </Card>
@@ -285,25 +289,18 @@ export default function DashboardPage() {
             <div>
               <p className='text-sm font-medium text-gray-700'>Location</p>
               <p className='text-sm text-gray-600'>
-                {hotelProfile.vendor.businessAddress}
+                {hotelProfile.vendor?.businessAddress || "N/A"}
               </p>
             </div>
             <div>
               <p className='text-sm font-medium text-gray-700'>Contact</p>
               <p className='text-sm text-gray-600'>
-                {hotelProfile.vendor.contactNumbers[0] || "N/A"}
-              </p>
-              <p className='text-sm text-gray-600'>
-                {hotelProfile.vendor.email}
+                {hotelProfile.vendor?.email || "N/A"}
               </p>
             </div>
-            <div className='flex justify-between items-center'>
-              <span className='text-sm font-medium text-gray-700'>
-                Total Rooms
-              </span>
-              <span className='text-sm text-gray-600'>
-                {hotelProfile.totalRooms}
-              </span>
+            <div>
+              <p className='text-sm font-medium text-gray-700'>Total Rooms</p>
+              <p className='text-sm text-gray-600'>{hotelProfile.totalRooms}</p>
             </div>
           </CardContent>
         </Card>

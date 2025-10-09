@@ -90,7 +90,7 @@ export function CardContent({ children, className }: CardProps) {
   return <div className={cn("p-6 pt-0", className)}>{children}</div>;
 }
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
 
 export function Input({ className, type, ...props }: InputProps) {
   return (
@@ -105,8 +105,7 @@ export function Input({ className, type, ...props }: InputProps) {
   );
 }
 
-interface TextareaProps
-  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>;
 
 export function Textarea({ className, ...props }: TextareaProps) {
   return (

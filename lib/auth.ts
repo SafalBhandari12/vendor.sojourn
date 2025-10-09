@@ -242,7 +242,7 @@ export class VendorAPI {
     let errorText = "";
     try {
       errorText = await response.text();
-    } catch (e) {
+    } catch {
       errorText = "Unable to read error response";
     }
 
@@ -269,7 +269,7 @@ export class VendorAPI {
           throw new Error(
             errorData.message || errorData.error || "Invalid request data"
           );
-        } catch (e) {
+        } catch {
           throw new Error(
             `Bad request: ${errorText || "Invalid data provided"}`
           );
@@ -281,7 +281,7 @@ export class VendorAPI {
             errorData.message ||
               "Validation error: Please check your input data"
           );
-        } catch (e) {
+        } catch {
           throw new Error("Validation error: Please check your input data");
         }
       }
@@ -295,7 +295,7 @@ export class VendorAPI {
 
     try {
       return JSON.parse(errorText) as Promise<T>;
-    } catch (e) {
+    } catch {
       throw new Error("Invalid response format from server");
     }
   }
@@ -358,20 +358,20 @@ export class VendorAPI {
     >(response);
   }
 
-  // Get vendor profile
+  // Get vendor profile (using hotel profile endpoint)
   static async getVendorProfile(): Promise<ApiResponse<VendorProfile>> {
-    const response = await fetch(`${BACKEND_URL}/auth/vendor/profile`, {
+    const response = await fetch(`${BACKEND_URL}/hotels/profile`, {
       headers: this.getAuthHeaders(),
     });
 
     return this.handleApiResponse<ApiResponse<VendorProfile>>(response);
   }
 
-  // Update vendor profile
+  // Update vendor profile (using hotel profile endpoint)
   static async updateVendorProfile(
     data: Partial<VendorProfile>
   ): Promise<ApiResponse<VendorProfile>> {
-    const response = await fetch(`${BACKEND_URL}/auth/vendor/profile`, {
+    const response = await fetch(`${BACKEND_URL}/hotels/profile`, {
       method: "PUT",
       headers: this.getAuthHeaders(),
       body: JSON.stringify(data),

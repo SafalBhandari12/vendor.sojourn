@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { HotelAPI, Booking } from "@/lib/hotelAPI";
 import {
   Card,
@@ -31,11 +31,7 @@ export default function BookingsPage() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const { showToast } = useToast();
 
-  useEffect(() => {
-    fetchBookings();
-  }, [statusFilter, currentPage]);
-
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await HotelAPI.getVendorBookings({
@@ -45,12 +41,19 @@ export default function BookingsPage() {
       });
       setBookings(response.data.bookings || []);
       setTotalPages(response.data.pagination.totalPages);
-    } catch (error: any) {
-      showToast(error.message || "Failed to fetch bookings", "error");
+    } catch (error: unknown) {
+      showToast(
+        (error as Error).message || "Failed to fetch bookings",
+        "error"
+      );
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter, currentPage, showToast]);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
 
   const handleConfirmBooking = async (bookingId: string) => {
     if (!confirm("Are you sure you want to confirm this booking?")) return;
@@ -59,8 +62,11 @@ export default function BookingsPage() {
       await HotelAPI.confirmBooking(bookingId);
       showToast("Booking confirmed successfully!", "success");
       fetchBookings();
-    } catch (error: any) {
-      showToast(error.message || "Failed to confirm booking", "error");
+    } catch (error: unknown) {
+      showToast(
+        (error as Error).message || "Failed to confirm booking",
+        "error"
+      );
     }
   };
 

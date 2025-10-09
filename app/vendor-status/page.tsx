@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { VendorAPI, VendorStatus } from "@/lib/auth";
 import {
@@ -19,21 +19,24 @@ export default function VendorStatusPage() {
   const [vendorStatus, setVendorStatus] = useState<VendorStatus | null>(null);
   const { showToast } = useToast();
 
-  useEffect(() => {
-    fetchVendorStatus();
-  }, []);
-
-  const fetchVendorStatus = async () => {
+  const fetchVendorStatus = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await VendorAPI.getVendorStatus();
       setVendorStatus(response.data);
-    } catch (error: any) {
-      showToast(error.message || "Failed to fetch vendor status", "error");
+    } catch (error: unknown) {
+      showToast(
+        (error as Error).message || "Failed to fetch vendor status",
+        "error"
+      );
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchVendorStatus();
+  }, [fetchVendorStatus]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

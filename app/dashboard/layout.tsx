@@ -44,12 +44,6 @@ export default function DashboardLayout({
       current: pathname === "/dashboard/bookings",
       icon: "bookings",
     },
-    {
-      name: "Profile",
-      href: "/dashboard/profile",
-      current: pathname === "/dashboard/profile",
-      icon: "profile",
-    },
   ];
 
   return (
