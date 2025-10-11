@@ -55,7 +55,7 @@ export default function DashboardPage() {
           HotelAPI.getVendorBookings(),
         ]);
 
-        const rooms = roomsResponse.data;
+        const rooms = roomsResponse.data.rooms;
         const bookings = bookingsResponse.data.bookings || [];
 
         // Calculate stats
@@ -109,12 +109,22 @@ export default function DashboardPage() {
           totalRevenue,
           monthlyRevenue,
         });
-      } catch {
+      } catch (profileError) {
         // Hotel profile doesn't exist yet
         setHotelProfile(null);
+        console.log("Hotel profile not found, showing onboarding");
       }
-    } catch {
-      showToast("Failed to load dashboard data", "error");
+    } catch (error) {
+      const errorMessage =
+        (error as Error).message || "Failed to load dashboard data";
+
+      // Don't show toast if it's an authentication error (user will be redirected)
+      if (
+        !errorMessage.includes("Session expired") &&
+        !errorMessage.includes("Authentication failed")
+      ) {
+        showToast(errorMessage, "error");
+      }
     } finally {
       setIsLoading(false);
     }

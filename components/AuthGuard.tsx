@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -9,44 +9,67 @@ interface AuthGuardProps {
 }
 
 export default function AuthGuard({ children }: AuthGuardProps) {
-  const { isAuthenticated, isLoading, user, checkTokenExpiration } = useAuth();
+  const { isAuthenticated, isLoading, user, checkTokenExpiration, logout } =
+    useAuth();
   const router = useRouter();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    console.log(
-      "AuthGuard - isLoading:",
-      isLoading,
-      "isAuthenticated:",
-      isAuthenticated,
-      "user:",
-      user
-    ); // Debug log
-
-    if (!isLoading) {
-      // Check token expiration on component mount
-      const isTokenValid = checkTokenExpiration();
-
-      if (!isAuthenticated || !isTokenValid) {
-        console.log(
-          "Redirecting to /auth - user not authenticated or token expired"
-        ); // Debug log
-        router.push("/auth");
-        return;
-      }
-    }
-
-    // Check if user has vendor role
-    if (!isLoading && isAuthenticated && user) {
+    const validateAuthentication = async () => {
       console.log(
-        "User role check - role:",
-        user.role,
-        "isVendor:",
-        user.role === "VENDOR"
+        "AuthGuard - isLoading:",
+        isLoading,
+        "isAuthenticated:",
+        isAuthenticated,
+        "user:",
+        user
       );
-    }
-  }, [isLoading, isAuthenticated, router, checkTokenExpiration, user]);
 
-  if (isLoading) {
+      if (!isLoading) {
+        try {
+          // Check if we have a token first
+          const token = localStorage.getItem("accessToken");
+
+          if (!token) {
+            console.log("No access token found, redirecting to auth");
+            router.replace("/auth");
+            return;
+          }
+
+          // Check token expiration
+          const isTokenValid = checkTokenExpiration();
+
+          if (!isAuthenticated || !isTokenValid) {
+            console.log(
+              "Redirecting to /auth - user not authenticated or token expired"
+            );
+            logout(); // Clear all auth state
+            router.replace("/auth");
+            return;
+          }
+
+          // Additional check: if user exists but doesn't have required role
+          if (user && user.role !== "VENDOR") {
+            console.log("User does not have vendor role");
+            setIsCheckingAuth(false);
+            return;
+          }
+
+          console.log("Authentication validated successfully");
+          setIsCheckingAuth(false);
+        } catch (error) {
+          console.error("Error during authentication validation:", error);
+          logout();
+          router.replace("/auth");
+        }
+      }
+    };
+
+    validateAuthentication();
+  }, [isLoading, isAuthenticated, user, router, checkTokenExpiration, logout]);
+
+  // Show loading while checking authentication
+  if (isLoading || isCheckingAuth) {
     return (
       <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
         <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600'></div>

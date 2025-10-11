@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { HotelAPI, createRoomFormData, Room } from "@/lib/hotelAPI";
+import { HotelAPI, Room, AddRoomData, RoomsListResponse } from "@/lib/hotelAPI";
+import { ImageUpload } from "@/components/ImageUpload";
 import Image from "next/image";
 import {
   Card,
@@ -41,13 +42,20 @@ const ROOM_AMENITIES = [
 
 export default function RoomsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [showAddRoom, setShowAddRoom] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
-  const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const [imageDescriptions, setImageDescriptions] = useState<string[]>([]);
+  const [images, setImages] = useState<
+    { file: File; description: string; isPrimary: boolean }[]
+  >([]);
   const [formData, setFormData] = useState({
-    roomType: "",
+    roomType: "" as "STANDARD" | "DELUXE" | "SUITE" | "DORMITORY" | "",
     roomNumber: "",
     capacity: "",
     basePrice: "",
@@ -57,17 +65,39 @@ export default function RoomsPage() {
   });
   const { showToast } = useToast();
 
-  const fetchRooms = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const response = await HotelAPI.getVendorRooms();
-      setRooms(response.data);
-    } catch (error: unknown) {
-      showToast((error as Error).message || "Failed to fetch rooms", "error");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [showToast]);
+  const fetchRooms = useCallback(
+    async (page: number = 1) => {
+      try {
+        setIsLoading(true);
+        const response = await HotelAPI.getVendorRooms({ page, limit: 10 });
+        setRooms(response.data.rooms);
+        setPagination(response.data.pagination);
+      } catch (error: unknown) {
+        const errorMessage =
+          (error as Error).message || "Failed to fetch rooms";
+
+        // Don't show toast if it's an authentication error (user will be redirected)
+        if (
+          !errorMessage.includes("Session expired") &&
+          !errorMessage.includes("Authentication failed")
+        ) {
+          showToast(errorMessage, "error");
+        }
+
+        // Reset rooms state on error to prevent infinite loops
+        setRooms([]);
+        setPagination({
+          page: 1,
+          limit: 10,
+          total: 0,
+          totalPages: 0,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [showToast]
+  );
 
   useEffect(() => {
     fetchRooms();
@@ -83,8 +113,7 @@ export default function RoomsPage() {
       winterPrice: "",
       amenities: [],
     });
-    setSelectedImages([]);
-    setImageDescriptions([]);
+    setImages([]);
     setEditingRoom(null);
     setShowAddRoom(false);
   };
@@ -105,10 +134,17 @@ export default function RoomsPage() {
     }));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setSelectedImages(files);
-    setImageDescriptions(files.map((_, index) => `Room image ${index + 1}`));
+  const handleImagesChange = (
+    files: File[],
+    descriptions: string[],
+    isPrimary: boolean[]
+  ) => {
+    const imageData = files.map((file, index) => ({
+      file,
+      description: descriptions[index] || "",
+      isPrimary: isPrimary[index] || false,
+    }));
+    setImages(imageData);
   };
 
   const handleEditRoom = (room: Room) => {
@@ -130,29 +166,53 @@ export default function RoomsPage() {
     setIsLoading(true);
 
     try {
-      const roomFormData = createRoomFormData(
-        {
-          ...formData,
-          capacity: parseInt(formData.capacity),
-          basePrice: parseFloat(formData.basePrice),
-          summerPrice: formData.summerPrice
-            ? parseFloat(formData.summerPrice)
-            : undefined,
-          winterPrice: formData.winterPrice
-            ? parseFloat(formData.winterPrice)
-            : undefined,
-        },
-        selectedImages,
-        imageDescriptions,
-        selectedImages.map((_, index) => index === 0) // First image is primary
-      );
+      // Prepare room data
+      const roomData: AddRoomData = {
+        roomType: formData.roomType as
+          | "STANDARD"
+          | "DELUXE"
+          | "SUITE"
+          | "DORMITORY",
+        capacity: parseInt(formData.capacity),
+        basePrice: parseFloat(formData.basePrice),
+        roomNumber: formData.roomNumber || undefined,
+        summerPrice: formData.summerPrice
+          ? parseFloat(formData.summerPrice)
+          : undefined,
+        winterPrice: formData.winterPrice
+          ? parseFloat(formData.winterPrice)
+          : undefined,
+        amenities: formData.amenities,
+        imageType: "room",
+        descriptions: images.map((img) => img.description),
+        isPrimary: images.map((img) => img.isPrimary.toString()),
+      };
 
+      let response;
       if (editingRoom) {
-        await HotelAPI.updateRoom(editingRoom.id, roomFormData);
+        response = await HotelAPI.updateRoom(
+          editingRoom.id,
+          roomData,
+          images.map((img) => img.file)
+        );
         showToast("Room updated successfully!", "success");
       } else {
-        await HotelAPI.addRoom(roomFormData);
+        response = await HotelAPI.addRoom(
+          roomData,
+          images.map((img) => img.file)
+        );
         showToast("Room added successfully!", "success");
+      }
+
+      // Handle any image upload errors
+      if (response.data.imageErrors && response.data.imageErrors.length > 0) {
+        const errorMessages = response.data.imageErrors
+          .map((err) => `Image ${err.index + 1}: ${err.error}`)
+          .join(", ");
+        showToast(
+          `Room saved with some image issues: ${errorMessages}`,
+          "warning"
+        );
       }
 
       resetForm();
@@ -320,49 +380,30 @@ export default function RoomsPage() {
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor='images'>Upload Room Images</Label>
-                <Input
-                  id='images'
-                  type='file'
-                  multiple
-                  accept='image/*'
-                  onChange={handleImageChange}
-                  className='mt-1'
-                />
-                <p className='text-sm text-gray-500 mt-1'>
-                  Upload high-quality images of the room. First image will be
-                  set as primary.
-                </p>
-              </div>
-
-              {selectedImages.length > 0 && (
-                <div>
-                  <Label>Image Descriptions</Label>
-                  <div className='space-y-2 mt-2'>
-                    {selectedImages.map((file, index) => (
-                      <div key={index} className='flex items-center space-x-2'>
-                        <span className='text-sm text-gray-600 w-32 truncate'>
-                          {file.name}
-                        </span>
-                        <Input
-                          value={imageDescriptions[index] || ""}
-                          onChange={(e) => {
-                            const newDescriptions = [...imageDescriptions];
-                            newDescriptions[index] = e.target.value;
-                            setImageDescriptions(newDescriptions);
-                          }}
-                          placeholder='Image description'
-                          className='flex-1'
-                        />
-                        {index === 0 && (
-                          <span className='text-xs text-blue-600'>Primary</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <ImageUpload
+                onImagesChange={handleImagesChange}
+                maxImages={5}
+                existingImages={
+                  editingRoom?.images?.map((img) => ({
+                    id: img.id,
+                    imageUrl: img.imageUrl,
+                    description: img.description,
+                    isPrimary: img.isPrimary,
+                  })) || []
+                }
+                onDeleteExisting={async (imageId: string) => {
+                  try {
+                    await HotelAPI.deleteRoomImage(imageId);
+                    showToast("Image deleted successfully!", "success");
+                    fetchRooms();
+                  } catch (error: unknown) {
+                    showToast(
+                      (error as Error).message || "Failed to delete image",
+                      "error"
+                    );
+                  }
+                }}
+              />
 
               <div className='flex space-x-4'>
                 <Button type='submit' disabled={isLoading}>
@@ -383,111 +424,123 @@ export default function RoomsPage() {
 
       {/* Rooms List */}
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-        {rooms.map((room) => (
-          <Card key={room.id} className='relative'>
-            <CardHeader>
-              <div className='flex justify-between items-start'>
-                <div>
-                  <CardTitle className='text-lg'>
-                    {room.roomType} - {room.roomNumber}
-                  </CardTitle>
-                  <p className='text-sm text-gray-600'>
-                    Capacity: {room.capacity} guests
-                  </p>
-                </div>
-                <Badge variant={room.isAvailable ? "default" : "destructive"}>
-                  {room.isAvailable ? "Available" : "Unavailable"}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className='space-y-3'>
-                {/* Room Image */}
-                {room.images && room.images.length > 0 && (
-                  <Image
-                    src={
-                      room.images.find((img) => img.isPrimary)?.thumbnailUrl ||
-                      room.images[0].imageUrl
-                    }
-                    alt={`${room.roomType} ${room.roomNumber}`}
-                    width={300}
-                    height={128}
-                    className='w-full h-32 object-cover rounded-lg'
-                  />
-                )}
+        {rooms && rooms.length > 0
+          ? rooms.map((room) => (
+              <Card key={room.id} className='relative'>
+                <CardHeader>
+                  <div className='flex justify-between items-start'>
+                    <div>
+                      <CardTitle className='text-lg'>
+                        {room.roomType} - {room.roomNumber}
+                      </CardTitle>
+                      <p className='text-sm text-gray-600'>
+                        Capacity: {room.capacity} guests
+                      </p>
+                    </div>
+                    <Badge
+                      variant={room.isAvailable ? "default" : "destructive"}
+                    >
+                      {room.isAvailable ? "Available" : "Unavailable"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className='space-y-3'>
+                    {/* Room Image */}
+                    {room.images && room.images.length > 0 && (
+                      <div className='relative w-full h-32 bg-gray-200 rounded-lg overflow-hidden'>
+                        <Image
+                          src={
+                            room.images.find((img) => img.isPrimary)
+                              ?.thumbnailUrl ||
+                            room.images.find((img) => img.isPrimary)
+                              ?.imageUrl ||
+                            room.images[0]?.imageUrl
+                          }
+                          alt={`${room.roomType} ${room.roomNumber}`}
+                          fill
+                          className='object-cover'
+                          sizes='(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
+                          onError={(e) => {
+                            console.error("Image failed to load:", e);
+                          }}
+                        />
+                      </div>
+                    )}
 
-                {/* Pricing */}
-                <div>
-                  <p className='text-lg font-semibold'>
-                    ₹{room.basePrice}/night
-                  </p>
-                  {(room.summerPrice || room.winterPrice) && (
-                    <div className='text-sm text-gray-600'>
-                      {room.summerPrice && (
-                        <span>Summer: ₹{room.summerPrice} </span>
-                      )}
-                      {room.winterPrice && (
-                        <span>Winter: ₹{room.winterPrice}</span>
+                    {/* Pricing */}
+                    <div>
+                      <p className='text-lg font-semibold'>
+                        ₹{room.basePrice}/night
+                      </p>
+                      {(room.summerPrice || room.winterPrice) && (
+                        <div className='text-sm text-gray-600'>
+                          {room.summerPrice && (
+                            <span>Summer: ₹{room.summerPrice} </span>
+                          )}
+                          {room.winterPrice && (
+                            <span>Winter: ₹{room.winterPrice}</span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
 
-                {/* Amenities */}
-                {room.amenities.length > 0 && (
-                  <div>
-                    <p className='text-sm font-medium text-gray-700 mb-1'>
-                      Amenities:
-                    </p>
-                    <div className='flex flex-wrap gap-1'>
-                      {room.amenities.slice(0, 4).map((amenity) => (
-                        <span
-                          key={amenity}
-                          className='px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs'
-                        >
-                          {amenity}
-                        </span>
-                      ))}
-                      {room.amenities.length > 4 && (
-                        <span className='text-xs text-gray-500'>
-                          +{room.amenities.length - 4} more
-                        </span>
-                      )}
+                    {/* Amenities */}
+                    {room.amenities.length > 0 && (
+                      <div>
+                        <p className='text-sm font-medium text-gray-700 mb-1'>
+                          Amenities:
+                        </p>
+                        <div className='flex flex-wrap gap-1'>
+                          {room.amenities.slice(0, 4).map((amenity) => (
+                            <span
+                              key={amenity}
+                              className='px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs'
+                            >
+                              {amenity}
+                            </span>
+                          ))}
+                          {room.amenities.length > 4 && (
+                            <span className='text-xs text-gray-500'>
+                              +{room.amenities.length - 4} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className='flex space-x-2 pt-2'>
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        onClick={() => handleEditRoom(room)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size='sm'
+                        variant={room.isAvailable ? "secondary" : "default"}
+                        onClick={() => handleToggleAvailability(room.id)}
+                      >
+                        {room.isAvailable ? "Disable" : "Enable"}
+                      </Button>
+                      <Button
+                        size='sm'
+                        variant='destructive'
+                        onClick={() => handleDeleteRoom(room.id)}
+                      >
+                        Delete
+                      </Button>
                     </div>
                   </div>
-                )}
-
-                {/* Actions */}
-                <div className='flex space-x-2 pt-2'>
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    onClick={() => handleEditRoom(room)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size='sm'
-                    variant={room.isAvailable ? "secondary" : "default"}
-                    onClick={() => handleToggleAvailability(room.id)}
-                  >
-                    {room.isAvailable ? "Disable" : "Enable"}
-                  </Button>
-                  <Button
-                    size='sm'
-                    variant='destructive'
-                    onClick={() => handleDeleteRoom(room.id)}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                </CardContent>
+              </Card>
+            ))
+          : null}
       </div>
 
-      {rooms.length === 0 && !isLoading && (
+      {rooms && rooms.length === 0 && !isLoading && (
         <Card>
           <CardContent className='text-center py-12'>
             <div className='w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4'>
@@ -516,6 +569,18 @@ export default function RoomsPage() {
             </Button>
           </CardContent>
         </Card>
+      )}
+
+      {/* Pagination Info */}
+      {rooms && rooms.length > 0 && (
+        <div className='flex justify-between items-center mt-6 p-4 bg-gray-50 rounded-lg'>
+          <span className='text-sm text-gray-600'>
+            Showing {rooms.length} of {pagination.total} rooms
+          </span>
+          <span className='text-sm text-gray-600'>
+            Page {pagination.page} of {pagination.totalPages}
+          </span>
+        </div>
       )}
     </div>
   );
