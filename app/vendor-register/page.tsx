@@ -73,23 +73,54 @@ export default function VendorRegistrationPage() {
   ) => {
     const { name, value } = e.target;
 
+    // Apply input validation for specific fields
+    let validatedValue = value;
+
+    if (name === "aadhaarNumber") {
+      // Only allow numbers for Aadhaar (12 digits)
+      validatedValue = value.replace(/[^0-9]/g, "").slice(0, 12);
+    } else if (name === "panNumber") {
+      // PAN format: AAAAA0000A (5 letters + 4 numbers + 1 letter)
+      validatedValue = value
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 10);
+    } else if (name === "gstNumber") {
+      // GST format: 15 characters (state code + PAN + entity + Z + checksum)
+      validatedValue = value
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 15);
+    } else if (name === "bankDetails.accountNumber") {
+      // Bank account: 9-18 digits only
+      validatedValue = value.replace(/[^0-9]/g, "").slice(0, 18);
+    } else if (name === "bankDetails.ifscCode") {
+      // IFSC: 4 letters + 0 + 6 digits
+      validatedValue = value
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 11);
+    }
+
     if (name.startsWith("bankDetails.")) {
       const bankField = name.split(".")[1];
       setFormData((prev) => ({
         ...prev,
         bankDetails: {
           ...prev.bankDetails,
-          [bankField]: value,
+          [bankField]: validatedValue,
         },
       }));
     } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
+      setFormData((prev) => ({ ...prev, [name]: validatedValue }));
     }
   };
 
   const handleContactNumberChange = (index: number, value: string) => {
+    // Only allow numbers for contact numbers (10 digits)
+    const validatedValue = value.replace(/[^0-9]/g, "").slice(0, 10);
     const newContactNumbers = [...formData.contactNumbers];
-    newContactNumbers[index] = value;
+    newContactNumbers[index] = validatedValue;
     setFormData((prev) => ({ ...prev, contactNumbers: newContactNumbers }));
   };
 
@@ -137,8 +168,28 @@ export default function VendorRegistrationPage() {
       let errorMessage =
         (error as Error).message || "Failed to submit vendor application";
 
-      // Provide more specific error messages
-      if (
+      // Parse validation errors
+      if (errorMessage.includes("Validation failed")) {
+        try {
+          // Extract the JSON part from the error message
+          const jsonMatch = errorMessage.match(/\{.*\}/);
+          if (jsonMatch) {
+            const errorData = JSON.parse(jsonMatch[0]);
+            if (errorData.errors && Array.isArray(errorData.errors)) {
+              const validationErrors = errorData.errors
+                .map(
+                  (err: { path: string; message: string }) =>
+                    `${err.path}: ${err.message}`
+                )
+                .join(", ");
+              errorMessage = `Please fix the following errors: ${validationErrors}`;
+            }
+          }
+        } catch (parseError) {
+          console.error("Failed to parse validation errors:", parseError);
+          errorMessage = "Please check your input data and try again.";
+        }
+      } else if (
         errorMessage.includes("CUSTOMER") ||
         errorMessage.includes("customer")
       ) {
@@ -147,10 +198,17 @@ export default function VendorRegistrationPage() {
         }) may not be eligible for vendor registration. Please contact support if you believe this is an error.`;
       } else if (
         errorMessage.includes("401") ||
-        errorMessage.includes("Authentication")
+        errorMessage.includes("Authentication") ||
+        errorMessage.includes("session may have expired")
       ) {
         errorMessage =
           "Session expired. Please log out and log back in to try again.";
+        // Clear tokens and redirect to auth
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        setTimeout(() => {
+          window.location.href = "/auth";
+        }, 2000);
       } else if (
         errorMessage.includes("403") ||
         errorMessage.includes("forbidden")
@@ -363,6 +421,8 @@ export default function VendorRegistrationPage() {
                         placeholder='9876543214'
                         className='flex-1'
                         required={index === 0}
+                        pattern='^[6-9][0-9]{9}$'
+                        title='Enter valid 10-digit Indian mobile number starting with 6-9'
                       />
                       {formData.contactNumbers.length > 1 && (
                         <Button
@@ -376,6 +436,9 @@ export default function VendorRegistrationPage() {
                       )}
                     </div>
                   ))}
+                  <p className='text-xs text-gray-500 mt-1'>
+                    10-digit Indian mobile numbers starting with 6-9
+                  </p>
                 </div>
               </div>
 
@@ -386,15 +449,20 @@ export default function VendorRegistrationPage() {
                 </h3>
                 <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
                   <div>
-                    <Label htmlFor='gstNumber'>GST Number *</Label>
+                    <Label htmlFor='gstNumber'>GST Number (GSTIN) *</Label>
                     <Input
                       id='gstNumber'
                       name='gstNumber'
                       value={formData.gstNumber}
                       onChange={handleInputChange}
                       required
-                      placeholder='27AAAAA0000A1Z5'
+                      placeholder='27ABCDE1234F1Z5'
+                      pattern='^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$'
+                      title='GST format: State code (2 digits) + PAN (10 chars) + Entity + Z + Checksum'
                     />
+                    <p className='text-xs text-gray-500 mt-1'>
+                      15-character GSTIN (e.g., 27ABCDE1234F1Z5)
+                    </p>
                   </div>
 
                   <div>
@@ -405,8 +473,13 @@ export default function VendorRegistrationPage() {
                       value={formData.panNumber}
                       onChange={handleInputChange}
                       required
-                      placeholder='AAAAA0000A'
+                      placeholder='ABCDE1234F'
+                      pattern='^[A-Z]{5}[0-9]{4}[A-Z]{1}$'
+                      title='PAN format: 5 letters + 4 digits + 1 letter'
                     />
+                    <p className='text-xs text-gray-500 mt-1'>
+                      10-character PAN (e.g., ABCDE1234F)
+                    </p>
                   </div>
 
                   <div>
@@ -418,7 +491,12 @@ export default function VendorRegistrationPage() {
                       onChange={handleInputChange}
                       required
                       placeholder='123456789012'
+                      pattern='^[0-9]{12}$'
+                      title='Aadhaar number must be exactly 12 digits'
                     />
+                    <p className='text-xs text-gray-500 mt-1'>
+                      12-digit Aadhaar number (numbers only)
+                    </p>
                   </div>
                 </div>
               </div>
@@ -479,8 +557,13 @@ export default function VendorRegistrationPage() {
                       value={formData.bankDetails.accountNumber}
                       onChange={handleInputChange}
                       required
-                      placeholder='123456789012'
+                      placeholder='935478216509'
+                      pattern='^[0-9]{9,18}$'
+                      title='Bank account number must be 9-18 digits'
                     />
+                    <p className='text-xs text-gray-500 mt-1'>
+                      9-18 digit account number (numbers only)
+                    </p>
                   </div>
 
                   <div>
@@ -491,8 +574,13 @@ export default function VendorRegistrationPage() {
                       value={formData.bankDetails.ifscCode}
                       onChange={handleInputChange}
                       required
-                      placeholder='SBIN0000123'
+                      placeholder='HDFC0004589'
+                      pattern='^[A-Z]{4}0[0-9]{6}$'
+                      title='IFSC format: 4 letters + 0 + 6 digits'
                     />
+                    <p className='text-xs text-gray-500 mt-1'>
+                      11-character IFSC (e.g., HDFC0004589)
+                    </p>
                   </div>
                 </div>
               </div>

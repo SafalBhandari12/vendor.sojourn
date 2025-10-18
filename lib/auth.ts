@@ -300,27 +300,13 @@ export class VendorAPI {
           `Access forbidden: You don't have permission to perform this action.`
         );
       } else if (response.status === 400) {
-        // Try to parse error message from response
-        try {
-          const errorData = JSON.parse(errorText);
-          throw new Error(
-            errorData.message || errorData.error || "Invalid request data"
-          );
-        } catch {
-          throw new Error(
-            `Bad request: ${errorText || "Invalid data provided"}`
-          );
-        }
+        // Try to parse error message from response - preserve full error for validation messages
+        throw new Error(`Bad request: ${errorText || "Invalid data provided"}`);
       } else if (response.status === 422) {
-        try {
-          const errorData = JSON.parse(errorText);
-          throw new Error(
-            errorData.message ||
-              "Validation error: Please check your input data"
-          );
-        } catch {
-          throw new Error("Validation error: Please check your input data");
-        }
+        // For validation errors, preserve the full error response
+        throw new Error(
+          `Validation failed: ${errorText || "Please check your input data"}`
+        );
       }
 
       throw new Error(

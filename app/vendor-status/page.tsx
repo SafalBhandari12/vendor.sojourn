@@ -17,9 +17,15 @@ export default function VendorStatusPage() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [vendorStatus, setVendorStatus] = useState<VendorStatus | null>(null);
+  const [hasAuthError, setHasAuthError] = useState(false);
   const { showToast } = useToast();
 
   const fetchVendorStatus = useCallback(async () => {
+    // Prevent multiple calls if already handling auth error
+    if (hasAuthError) {
+      return;
+    }
+
     try {
       setIsLoading(true);
 
@@ -30,8 +36,25 @@ export default function VendorStatusPage() {
         return;
       }
 
+      // Check if access token exists
+      const accessToken = localStorage.getItem("accessToken");
+      if (!accessToken) {
+        setHasAuthError(true);
+        showToast(
+          "No authentication token found. Please log in again.",
+          "error"
+        );
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        setTimeout(() => {
+          window.location.href = "/auth";
+        }, 1500);
+        return;
+      }
+
       const response = await VendorAPI.getVendorStatus();
       setVendorStatus(response.data);
+      setHasAuthError(false); // Reset auth error state on success
     } catch (error: unknown) {
       const errorMessage =
         (error as Error).message || "Failed to fetch vendor status";
@@ -39,13 +62,17 @@ export default function VendorStatusPage() {
       // Handle authentication errors specifically
       if (
         errorMessage.includes("Authentication failed") ||
-        errorMessage.includes("session may have expired")
+        errorMessage.includes("session may have expired") ||
+        errorMessage.includes("401")
       ) {
-        showToast("Your session has expired. Please log in again.", "error");
+        setHasAuthError(true);
+        showToast("Your session has expired. Redirecting to login...", "error");
         // Clear tokens and redirect to auth page
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
-        window.location.href = "/auth";
+        setTimeout(() => {
+          window.location.href = "/auth";
+        }, 1500);
         return;
       }
 
@@ -53,16 +80,16 @@ export default function VendorStatusPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast, user]);
+  }, [showToast, user, hasAuthError]);
 
   useEffect(() => {
-    // Only fetch vendor status if user is authenticated
-    if (user) {
+    // Only fetch vendor status if user is authenticated and no auth error
+    if (user && !hasAuthError) {
       fetchVendorStatus();
-    } else {
+    } else if (!user) {
       setIsLoading(false);
     }
-  }, [fetchVendorStatus, user]);
+  }, [fetchVendorStatus, user, hasAuthError]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -249,8 +276,12 @@ export default function VendorStatusPage() {
                 </Link>
               )}
 
-              <Button onClick={fetchVendorStatus} variant='outline'>
-                Refresh Status
+              <Button
+                onClick={fetchVendorStatus}
+                variant='outline'
+                disabled={isLoading || hasAuthError}
+              >
+                {isLoading ? "Refreshing..." : "Refresh Status"}
               </Button>
             </div>
 
