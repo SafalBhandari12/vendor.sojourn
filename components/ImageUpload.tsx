@@ -116,7 +116,7 @@ export function ImageUpload({
           multiple
           accept='image/*'
           onChange={handleFileSelect}
-          className='mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
+          className='mt-1 flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
         />
         <p className='text-sm text-gray-500 mt-1'>
           Upload high-quality images of the room. Maximum {maxImages} images
@@ -129,7 +129,7 @@ export function ImageUpload({
         <div>
           <Label>Existing Images</Label>
           <div className='grid grid-cols-2 md:grid-cols-3 gap-4 mt-2'>
-            {existingImages.map((image, index) => (
+            {existingImages.map((image) => (
               <div key={image.id} className='relative group'>
                 <Image
                   src={image.imageUrl}

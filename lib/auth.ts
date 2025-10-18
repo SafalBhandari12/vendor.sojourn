@@ -238,6 +238,43 @@ export class VendorAPI {
     };
   }
 
+  private static validateToken(): boolean {
+    const token = TokenStorage.getAccessToken();
+    if (!token) {
+      throw new Error(
+        "Authentication failed: No access token found. Please login again."
+      );
+    }
+
+    try {
+      // Simple JWT decode without requiring external library
+      const base64Payload = token.split(".")[1];
+      const decodedPayload = JSON.parse(atob(base64Payload));
+
+      if (
+        decodedPayload &&
+        decodedPayload.exp &&
+        decodedPayload.exp * 1000 <= Date.now()
+      ) {
+        throw new Error(
+          "Authentication failed: Your session has expired. Please login again."
+        );
+      }
+
+      return true;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Authentication failed")
+      ) {
+        throw error;
+      }
+      // If JWT decode fails, still try the request but token might be invalid
+      console.warn("Token validation failed, proceeding with request:", error);
+      return true;
+    }
+  }
+
   private static async handleApiResponse<T>(response: Response): Promise<T> {
     let errorText = "";
     try {
@@ -305,6 +342,8 @@ export class VendorAPI {
     data: VendorRegistrationData
   ): Promise<ApiResponse<VendorProfile>> {
     try {
+      this.validateToken();
+
       console.log(
         "Making vendor registration request to:",
         `${BACKEND_URL}/auth/vendor/register`
@@ -329,6 +368,8 @@ export class VendorAPI {
 
   // Check vendor application status
   static async getVendorStatus(): Promise<ApiResponse<VendorStatus>> {
+    this.validateToken();
+
     const response = await fetch(`${BACKEND_URL}/auth/vendor/status`, {
       headers: this.getAuthHeaders(),
     });
@@ -338,6 +379,8 @@ export class VendorAPI {
 
   // Get current user profile
   static async getUserProfile(): Promise<ApiResponse<User>> {
+    this.validateToken();
+
     const response = await fetch(`${BACKEND_URL}/auth/profile`, {
       headers: this.getAuthHeaders(),
     });
@@ -349,6 +392,8 @@ export class VendorAPI {
   static async getUserDetails(): Promise<
     ApiResponse<{ user: User; vendor?: VendorProfile }>
   > {
+    this.validateToken();
+
     const response = await fetch(`${BACKEND_URL}/auth/me`, {
       headers: this.getAuthHeaders(),
     });
@@ -360,6 +405,8 @@ export class VendorAPI {
 
   // Get vendor profile (using hotel profile endpoint)
   static async getVendorProfile(): Promise<ApiResponse<VendorProfile>> {
+    this.validateToken();
+
     const response = await fetch(`${BACKEND_URL}/hotels/profile`, {
       headers: this.getAuthHeaders(),
     });
@@ -371,6 +418,8 @@ export class VendorAPI {
   static async updateVendorProfile(
     data: Partial<VendorProfile>
   ): Promise<ApiResponse<VendorProfile>> {
+    this.validateToken();
+
     const response = await fetch(`${BACKEND_URL}/hotels/profile`, {
       method: "PUT",
       headers: this.getAuthHeaders(),

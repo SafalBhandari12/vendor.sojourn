@@ -141,7 +141,7 @@ export function OTPVerification({
     <form onSubmit={handleSubmit} className='space-y-6'>
       <div className='text-center'>
         <p className='text-sm text-gray-600'>
-          OTP sent to +91 {verificationData.phoneNumber}
+          OTP sent to {verificationData.phoneNumber}
         </p>
         <button
           type='button'
@@ -167,7 +167,7 @@ export function OTPVerification({
               value={digit}
               onChange={(e) => handleOtpChange(index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(index, e)}
-              className='w-12 h-12 text-center text-lg font-semibold border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500'
+              className='w-12 h-12 text-center text-lg font-semibold border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-black'
               maxLength={1}
             />
           ))}

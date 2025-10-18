@@ -360,7 +360,7 @@ export default function VendorRegistrationPage() {
                         onChange={(e) =>
                           handleContactNumberChange(index, e.target.value)
                         }
-                        placeholder='+91-9876543214'
+                        placeholder='9876543214'
                         className='flex-1'
                         required={index === 0}
                       />
@@ -417,7 +417,7 @@ export default function VendorRegistrationPage() {
                       value={formData.aadhaarNumber}
                       onChange={handleInputChange}
                       required
-                      placeholder='1234-5678-9012'
+                      placeholder='123456789012'
                     />
                   </div>
                 </div>

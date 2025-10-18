@@ -11,6 +11,7 @@ import {
   Badge,
   Select,
   Label,
+  Input,
 } from "@/components/ui";
 import { useToast } from "@/contexts/ToastContext";
 
@@ -26,6 +27,7 @@ export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -55,10 +57,11 @@ export default function BookingsPage() {
     fetchBookings();
   }, [fetchBookings]);
 
-  const handleConfirmBooking = async (bookingId: string) => {
+  const handleConfirmBooking = async (booking: Booking) => {
     if (!confirm("Are you sure you want to confirm this booking?")) return;
 
     try {
+      const bookingId = booking.id || booking.bookingRef;
       await HotelAPI.confirmBooking(bookingId);
       showToast("Booking confirmed successfully!", "success");
       fetchBookings();
@@ -93,7 +96,30 @@ export default function BookingsPage() {
     });
   };
 
-  const calculateNights = (checkIn: string, checkOut: string) => {
+  // Filter bookings based on search query
+  const filteredBookings = bookings.filter((booking) => {
+    if (!searchQuery) return true;
+
+    const query = searchQuery.toLowerCase();
+    const bookingId = (booking.id || booking.bookingRef || "").toLowerCase();
+    const bookingRef = (booking.bookingRef || "").toLowerCase();
+    const customerName = `${booking.customer?.firstName || ""} ${
+      booking.customer?.lastName || ""
+    }`.toLowerCase();
+    const customerPhone = (booking.customer?.phoneNumber || "").toLowerCase();
+    const roomInfo =
+      `${booking.room.type} ${booking.room.number}`.toLowerCase();
+
+    return (
+      bookingId.includes(query) ||
+      bookingRef.includes(query) ||
+      customerName.includes(query) ||
+      customerPhone.includes(query) ||
+      roomInfo.includes(query)
+    );
+  });
+
+  const calculateNights = (checkIn: string, checkOut: string): number => {
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
     const diffTime = Math.abs(checkOutDate.getTime() - checkInDate.getTime());
@@ -120,6 +146,19 @@ export default function BookingsPage() {
         </div>
         <div className='flex items-center space-x-4'>
           <div>
+            <Label htmlFor='searchQuery'>Search Bookings</Label>
+            <Input
+              id='searchQuery'
+              placeholder='Search by booking ID, customer name, or phone...'
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className='w-64'
+            />
+          </div>
+          <div>
             <Label htmlFor='statusFilter'>Filter by Status</Label>
             <Select
               id='statusFilter'
@@ -141,16 +180,16 @@ export default function BookingsPage() {
 
       {/* Bookings Grid */}
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-        {bookings.map((booking) => (
+        {filteredBookings.map((booking) => (
           <Card key={booking.id} className='relative'>
             <CardHeader>
               <div className='flex justify-between items-start'>
                 <div>
                   <CardTitle className='text-lg'>
-                    {booking.room.roomType} - {booking.room.roomNumber}
+                    {booking.room.type} - {booking.room.number}
                   </CardTitle>
                   <p className='text-sm text-gray-600'>
-                    Booking ID: {booking.id.slice(-8)}
+                    Booking ID: {booking.bookingRef || booking.id?.slice(-8)}
                   </p>
                 </div>
                 <Badge className={getStatusColor(booking.status)}>
@@ -160,18 +199,34 @@ export default function BookingsPage() {
             </CardHeader>
             <CardContent>
               <div className='space-y-3'>
-                {/* Guest Information */}
+                {/* Customer & Guest Information */}
                 <div>
                   <p className='text-sm font-medium text-gray-700'>
-                    Guest Details:
+                    Primary Guest:
                   </p>
                   <p className='text-sm text-gray-600'>
-                    {booking.customer?.phoneNumber ||
-                      "Customer Info Not Available"}
+                    {booking.customer?.firstName} {booking.customer?.lastName}
                   </p>
+                  <p className='text-sm text-gray-500'>
+                    {booking.customer?.phoneNumber || "Phone not available"}
+                  </p>
+                  {booking.customer?.email && (
+                    <p className='text-sm text-gray-500'>
+                      {booking.customer.email}
+                    </p>
+                  )}
                   <p className='text-sm text-gray-600'>
                     {booking.numberOfGuests} guest
                     {booking.numberOfGuests > 1 ? "s" : ""}
+                    {booking.guests && booking.guests.length > 0 && (
+                      <span className='text-gray-500'>
+                        {" "}
+                        • {
+                          booking.guests.filter((g) => g.hasIdProof).length
+                        }{" "}
+                        with ID
+                      </span>
+                    )}
                   </p>
                 </div>
 
@@ -198,14 +253,49 @@ export default function BookingsPage() {
                   </p>
                 </div>
 
+                {/* Special Requests */}
+                {booking.specialRequests && (
+                  <div>
+                    <p className='text-sm font-medium text-gray-700'>
+                      Special Requests:
+                    </p>
+                    <p className='text-sm text-gray-600 italic'>
+                      &quot;{booking.specialRequests}&quot;
+                    </p>
+                  </div>
+                )}
+
+                {/* Payment Status */}
+                {booking.payment && (
+                  <div>
+                    <p className='text-sm font-medium text-gray-700'>
+                      Payment:
+                    </p>
+                    <Badge
+                      variant={
+                        booking.payment.status === "SUCCESS"
+                          ? "default"
+                          : "destructive"
+                      }
+                    >
+                      {booking.payment.status}
+                    </Badge>
+                    {booking.payment.method && (
+                      <span className='text-sm text-gray-500 ml-2'>
+                        via {booking.payment.method}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {/* Pricing */}
                 <div>
                   <p className='text-lg font-semibold'>
                     Total: ₹{booking.totalAmount}
                   </p>
-                  {booking.booking.commissionAmount && (
+                  {booking.commissionAmount && (
                     <p className='text-sm text-gray-600'>
-                      Commission: ₹{booking.booking.commissionAmount}
+                      Commission: ₹{booking.commissionAmount}
                     </p>
                   )}
                 </div>
@@ -229,7 +319,7 @@ export default function BookingsPage() {
                   {booking.status === "PENDING" && (
                     <Button
                       size='sm'
-                      onClick={() => handleConfirmBooking(booking.id)}
+                      onClick={() => handleConfirmBooking(booking)}
                     >
                       Confirm
                     </Button>
@@ -266,7 +356,7 @@ export default function BookingsPage() {
         </div>
       )}
 
-      {bookings.length === 0 && !isLoading && (
+      {filteredBookings.length === 0 && !isLoading && (
         <Card>
           <CardContent className='text-center py-12'>
             <div className='w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4'>
@@ -288,7 +378,9 @@ export default function BookingsPage() {
               No bookings found
             </h3>
             <p className='text-gray-600'>
-              {statusFilter
+              {searchQuery
+                ? `No bookings found matching "${searchQuery}".`
+                : statusFilter
                 ? `No ${statusFilter.toLowerCase()} bookings found.`
                 : "You haven't received any bookings yet."}
             </p>
@@ -299,10 +391,17 @@ export default function BookingsPage() {
       {/* Booking Details Modal */}
       {selectedBooking && (
         <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50'>
-          <Card className='max-w-2xl w-full max-h-96 overflow-y-auto'>
+          <Card className='max-w-4xl w-full max-h-[90vh] overflow-y-auto'>
             <CardHeader>
               <div className='flex justify-between items-start'>
-                <CardTitle>Booking Details</CardTitle>
+                <div>
+                  <CardTitle>Booking Details</CardTitle>
+                  <p className='text-sm text-gray-600'>
+                    Booking Ref:{" "}
+                    {selectedBooking.bookingRef ||
+                      selectedBooking.id?.slice(-8)}
+                  </p>
+                </div>
                 <Button
                   variant='ghost'
                   size='sm'
@@ -325,84 +424,252 @@ export default function BookingsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className='space-y-4'>
-                <div className='grid grid-cols-2 gap-4'>
-                  <div>
-                    <Label className='text-sm font-medium text-gray-700'>
-                      Booking ID
-                    </Label>
-                    <p className='text-sm'>{selectedBooking.id}</p>
+              <div className='space-y-6'>
+                {/* Basic Booking Info */}
+                <div>
+                  <h3 className='text-lg font-semibold mb-3'>
+                    Booking Information
+                  </h3>
+                  <div className='grid grid-cols-2 md:grid-cols-3 gap-4'>
+                    <div>
+                      <Label className='text-sm font-medium text-gray-700'>
+                        Booking ID
+                      </Label>
+                      <p className='text-sm'>
+                        {selectedBooking.id || selectedBooking.bookingRef}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className='text-sm font-medium text-gray-700'>
+                        Status
+                      </Label>
+                      <Badge className={getStatusColor(selectedBooking.status)}>
+                        {selectedBooking.status}
+                      </Badge>
+                    </div>
+                    <div>
+                      <Label className='text-sm font-medium text-gray-700'>
+                        Room
+                      </Label>
+                      <p className='text-sm'>
+                        {selectedBooking.room.type} -{" "}
+                        {selectedBooking.room.number}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className='text-sm font-medium text-gray-700'>
+                        Check-in
+                      </Label>
+                      <p className='text-sm'>
+                        {formatDate(selectedBooking.checkInDate)}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className='text-sm font-medium text-gray-700'>
+                        Check-out
+                      </Label>
+                      <p className='text-sm'>
+                        {formatDate(selectedBooking.checkOutDate)}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className='text-sm font-medium text-gray-700'>
+                        Booking Date
+                      </Label>
+                      <p className='text-sm'>
+                        {formatDate(selectedBooking.createdAt)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <Label className='text-sm font-medium text-gray-700'>
-                      Status
-                    </Label>
-                    <Badge className={getStatusColor(selectedBooking.status)}>
-                      {selectedBooking.status}
-                    </Badge>
+                </div>
+
+                {/* Customer Information */}
+                <div>
+                  <h3 className='text-lg font-semibold mb-3'>
+                    Customer Information
+                  </h3>
+                  <div className='grid grid-cols-2 md:grid-cols-3 gap-4'>
+                    <div>
+                      <Label className='text-sm font-medium text-gray-700'>
+                        Name
+                      </Label>
+                      <p className='text-sm'>
+                        {selectedBooking.customer?.firstName}{" "}
+                        {selectedBooking.customer?.lastName}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className='text-sm font-medium text-gray-700'>
+                        Phone
+                      </Label>
+                      <p className='text-sm'>
+                        {selectedBooking.customer?.phoneNumber ||
+                          "Not provided"}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className='text-sm font-medium text-gray-700'>
+                        Email
+                      </Label>
+                      <p className='text-sm'>
+                        {selectedBooking.customer?.email || "Not provided"}
+                      </p>
+                    </div>
+                    {selectedBooking.customer?.emergencyContact && (
+                      <div>
+                        <Label className='text-sm font-medium text-gray-700'>
+                          Emergency Contact
+                        </Label>
+                        <p className='text-sm'>
+                          {selectedBooking.customer.emergencyContact}
+                        </p>
+                      </div>
+                    )}
+                    {selectedBooking.customer?.idProofType && (
+                      <div>
+                        <Label className='text-sm font-medium text-gray-700'>
+                          ID Proof
+                        </Label>
+                        <p className='text-sm'>
+                          {selectedBooking.customer.idProofType}
+                          {selectedBooking.customer.hasIdProof && " ✓"}
+                        </p>
+                      </div>
+                    )}
                   </div>
+                </div>
+
+                {/* Guest Details */}
+                {selectedBooking.guests &&
+                  selectedBooking.guests.length > 0 && (
+                    <div>
+                      <h3 className='text-lg font-semibold mb-3'>
+                        Guest Details ({selectedBooking.guests.length} guest
+                        {selectedBooking.guests.length > 1 ? "s" : ""})
+                      </h3>
+                      <div className='space-y-3'>
+                        {selectedBooking.guests.map((guest, index) => (
+                          <div
+                            key={index}
+                            className='p-3 border rounded-lg bg-gray-50'
+                          >
+                            <div className='grid grid-cols-2 md:grid-cols-4 gap-3'>
+                              <div>
+                                <Label className='text-xs font-medium text-gray-700'>
+                                  Name
+                                </Label>
+                                <p className='text-sm'>
+                                  {guest.firstName} {guest.lastName}
+                                  {guest.isPrimaryGuest && (
+                                    <Badge
+                                      variant='outline'
+                                      className='ml-2 text-xs'
+                                    >
+                                      Primary
+                                    </Badge>
+                                  )}
+                                </p>
+                              </div>
+                              {guest.age && (
+                                <div>
+                                  <Label className='text-xs font-medium text-gray-700'>
+                                    Age
+                                  </Label>
+                                  <p className='text-sm'>{guest.age} years</p>
+                                </div>
+                              )}
+                              {guest.idProofType && (
+                                <div>
+                                  <Label className='text-xs font-medium text-gray-700'>
+                                    ID Proof
+                                  </Label>
+                                  <p className='text-sm'>
+                                    {guest.idProofType}
+                                    {guest.hasIdProof && " ✓"}
+                                  </p>
+                                </div>
+                              )}
+                              {guest.specialRequests && (
+                                <div className='col-span-2 md:col-span-4'>
+                                  <Label className='text-xs font-medium text-gray-700'>
+                                    Special Requests
+                                  </Label>
+                                  <p className='text-sm italic text-gray-600'>
+                                    &quot;{guest.specialRequests}&quot;
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                {/* Special Requests */}
+                {selectedBooking.specialRequests && (
                   <div>
-                    <Label className='text-sm font-medium text-gray-700'>
-                      Room
-                    </Label>
-                    <p className='text-sm'>
-                      {selectedBooking.room.roomType} -{" "}
-                      {selectedBooking.room.roomNumber}
-                    </p>
+                    <h3 className='text-lg font-semibold mb-3'>
+                      Booking Special Requests
+                    </h3>
+                    <div className='p-3 border rounded-lg bg-blue-50'>
+                      <p className='text-sm italic text-gray-700'>
+                        &quot;{selectedBooking.specialRequests}&quot;
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <Label className='text-sm font-medium text-gray-700'>
-                      Guests
-                    </Label>
-                    <p className='text-sm'>{selectedBooking.numberOfGuests}</p>
-                  </div>
-                  <div>
-                    <Label className='text-sm font-medium text-gray-700'>
-                      Check-in
-                    </Label>
-                    <p className='text-sm'>
-                      {formatDate(selectedBooking.checkInDate)}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className='text-sm font-medium text-gray-700'>
-                      Check-out
-                    </Label>
-                    <p className='text-sm'>
-                      {formatDate(selectedBooking.checkOutDate)}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className='text-sm font-medium text-gray-700'>
-                      Total Amount
-                    </Label>
-                    <p className='text-sm font-semibold'>
-                      ₹{selectedBooking.totalAmount}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className='text-sm font-medium text-gray-700'>
-                      Commission
-                    </Label>
-                    <p className='text-sm'>
-                      ₹{selectedBooking.booking.commissionAmount || 0}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className='text-sm font-medium text-gray-700'>
-                      Booking Date
-                    </Label>
-                    <p className='text-sm'>
-                      {formatDate(selectedBooking.createdAt)}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className='text-sm font-medium text-gray-700'>
-                      Customer
-                    </Label>
-                    <p className='text-sm'>
-                      {selectedBooking.customer?.phoneNumber || "N/A"}
-                    </p>
+                )}
+
+                {/* Payment Information */}
+                <div>
+                  <h3 className='text-lg font-semibold mb-3'>
+                    Payment Information
+                  </h3>
+                  <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
+                    <div>
+                      <Label className='text-sm font-medium text-gray-700'>
+                        Total Amount
+                      </Label>
+                      <p className='text-lg font-semibold'>
+                        ₹{selectedBooking.totalAmount}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className='text-sm font-medium text-gray-700'>
+                        Commission
+                      </Label>
+                      <p className='text-sm'>
+                        ₹{selectedBooking.commissionAmount || 0}
+                      </p>
+                    </div>
+                    {selectedBooking.payment && (
+                      <>
+                        <div>
+                          <Label className='text-sm font-medium text-gray-700'>
+                            Payment Status
+                          </Label>
+                          <Badge
+                            variant={
+                              selectedBooking.payment.status === "SUCCESS"
+                                ? "default"
+                                : "destructive"
+                            }
+                          >
+                            {selectedBooking.payment.status}
+                          </Badge>
+                        </div>
+                        {selectedBooking.payment.method && (
+                          <div>
+                            <Label className='text-sm font-medium text-gray-700'>
+                              Payment Method
+                            </Label>
+                            <p className='text-sm'>
+                              {selectedBooking.payment.method}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -410,7 +677,7 @@ export default function BookingsPage() {
                   <div className='pt-4 border-t'>
                     <Button
                       onClick={() => {
-                        handleConfirmBooking(selectedBooking.id);
+                        handleConfirmBooking(selectedBooking);
                         setSelectedBooking(null);
                       }}
                       className='w-full'

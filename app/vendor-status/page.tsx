@@ -22,21 +22,47 @@ export default function VendorStatusPage() {
   const fetchVendorStatus = useCallback(async () => {
     try {
       setIsLoading(true);
+
+      // Check if user is authenticated and token is valid before making API call
+      if (!user) {
+        showToast("Please log in to view vendor status", "error");
+        setIsLoading(false);
+        return;
+      }
+
       const response = await VendorAPI.getVendorStatus();
       setVendorStatus(response.data);
     } catch (error: unknown) {
-      showToast(
-        (error as Error).message || "Failed to fetch vendor status",
-        "error"
-      );
+      const errorMessage =
+        (error as Error).message || "Failed to fetch vendor status";
+
+      // Handle authentication errors specifically
+      if (
+        errorMessage.includes("Authentication failed") ||
+        errorMessage.includes("session may have expired")
+      ) {
+        showToast("Your session has expired. Please log in again.", "error");
+        // Clear tokens and redirect to auth page
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        window.location.href = "/auth";
+        return;
+      }
+
+      showToast(errorMessage, "error");
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, user]);
 
   useEffect(() => {
-    fetchVendorStatus();
-  }, [fetchVendorStatus]);
+    // Only fetch vendor status if user is authenticated
+    if (user) {
+      fetchVendorStatus();
+    } else {
+      setIsLoading(false);
+    }
+  }, [fetchVendorStatus, user]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -230,15 +256,16 @@ export default function VendorStatusPage() {
 
             {/* Additional Info */}
             <div className='text-center'>
-              <p className='text-sm text-gray-600'>
-                Need help?{" "}
-                <a
-                  href='mailto:support@sojourn.com'
-                  className='text-blue-600 hover:text-blue-800'
-                >
-                  Contact Support
-                </a>
-              </p>
+              <button
+                onClick={() => {
+                  localStorage.removeItem("accessToken");
+                  localStorage.removeItem("refreshToken");
+                  window.location.reload();
+                }}
+                className='w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 text-white px-4 py-3 rounded-xl text-sm font-medium transition-all shadow-md hover:shadow-lg'
+              >
+                Sign in
+              </button>
             </div>
           </CardContent>
         </Card>

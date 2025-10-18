@@ -109,33 +109,92 @@ export interface RoomsListResponse {
   };
 }
 
-export interface Booking {
+// Enhanced booking interfaces for the new API
+export interface Guest {
   id: string;
+  firstName: string;
+  lastName: string;
+  age?: number;
+  isPrimaryGuest: boolean;
+  specialRequests?: string;
+  hasIdProof: boolean;
+  idProofType?:
+    | "AADHAR"
+    | "PASSPORT"
+    | "DRIVING_LICENSE"
+    | "VOTER_ID"
+    | "PAN_CARD";
+  idProofNumber?: string; // Only visible to customer, hidden for vendor
+}
+
+export interface CustomerDetails {
+  phoneNumber: string; // Masked for vendors (********90)
+  firstName: string;
+  lastName: string;
+  email?: string;
+  emergencyContact?: string;
+  hasIdProof: boolean;
+  idProofType?:
+    | "AADHAR"
+    | "PASSPORT"
+    | "DRIVING_LICENSE"
+    | "VOTER_ID"
+    | "PAN_CARD";
+  dateOfBirth?: string;
+  address?: string;
+}
+
+export interface PaymentDetails {
+  status: "PENDING" | "SUCCESS" | "FAILED";
+  method?: "RAZORPAY" | "STRIPE" | "CASH";
+  transactionId?: string;
+}
+
+export interface Booking {
+  bookingRef: string;
+  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
   checkInDate: string;
   checkOutDate: string;
   numberOfGuests: number;
   totalAmount: number;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
-  booking: {
-    id: string;
-    totalAmount: number;
-    commissionAmount: number;
-  };
-  hotelProfile: {
-    hotelName: string;
-    vendor: {
-      businessName: string;
-    };
-  };
-  room: {
-    roomType: string;
-    roomNumber: string;
-  };
-  customer?: {
-    phoneNumber: string;
-  };
   createdAt: string;
-  updatedAt: string;
+  specialRequests?: string;
+
+  // Customer and guest information
+  customer: {
+    phoneNumber: string; // Masked for vendors
+    firstName: string;
+    lastName: string;
+    email?: string;
+    emergencyContact?: string;
+    hasIdProof?: boolean;
+    idProofType?: string;
+  };
+
+  guests: Array<{
+    firstName: string;
+    lastName: string;
+    age?: number;
+    isPrimaryGuest: boolean;
+    specialRequests?: string;
+    hasIdProof: boolean;
+    idProofType?: string;
+  }>;
+
+  room: {
+    type: string;
+    number: string;
+  };
+
+  payment: {
+    status: "PENDING" | "SUCCESS" | "FAILED";
+    method?: string;
+  };
+
+  // Optional fields for compatibility (may not be present in vendor responses)
+  id?: string;
+  updatedAt?: string;
+  commissionAmount?: number;
 }
 
 export interface PaymentOrder {
@@ -289,7 +348,7 @@ export class HotelAPI {
     });
 
     // Add images
-    images.forEach((image, index) => {
+    images.forEach((image) => {
       formData.append("images", image);
     });
 

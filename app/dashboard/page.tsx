@@ -109,7 +109,7 @@ export default function DashboardPage() {
           totalRevenue,
           monthlyRevenue,
         });
-      } catch (profileError) {
+      } catch (error) {
         // Hotel profile doesn't exist yet
         setHotelProfile(null);
         console.log("Hotel profile not found, showing onboarding");

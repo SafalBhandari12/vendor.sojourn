@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { HotelAPI, Room, AddRoomData, RoomsListResponse } from "@/lib/hotelAPI";
+import { HotelAPI, Room, AddRoomData } from "@/lib/hotelAPI";
 import { ImageUpload } from "@/components/ImageUpload";
 import Image from "next/image";
 import {
