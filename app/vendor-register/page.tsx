@@ -95,7 +95,7 @@ export default function VendorRegistrationPage() {
       // Bank account: 9-18 digits only
       validatedValue = value.replace(/[^0-9]/g, "").slice(0, 18);
     } else if (name === "bankDetails.ifscCode") {
-      // IFSC: 4 letters + 0 + 6 digits
+      // IFSC: 4 bank letters + 0 + 6 branch characters (letters/numbers)
       validatedValue = value
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "")
@@ -574,12 +574,13 @@ export default function VendorRegistrationPage() {
                       value={formData.bankDetails.ifscCode}
                       onChange={handleInputChange}
                       required
-                      placeholder='HDFC0004589'
-                      pattern='^[A-Z]{4}0[0-9]{6}$'
-                      title='IFSC format: 4 letters + 0 + 6 digits'
+                      placeholder='JAKA0BEMINA'
+                      pattern='^[A-Z]{4}0[A-Z0-9]{6}$'
+                      title='IFSC format: 4 bank letters + 0 + 6 branch characters'
                     />
                     <p className='text-xs text-gray-500 mt-1'>
-                      11-character IFSC (e.g., HDFC0004589)
+                      11-character IFSC (e.g., JAKA0BEMINA - Bank code + 0 +
+                      Branch code)
                     </p>
                   </div>
                 </div>
