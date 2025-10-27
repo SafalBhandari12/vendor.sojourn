@@ -579,8 +579,8 @@ export default function VendorRegistrationPage() {
                       title='IFSC format: 4 bank letters + 0 + 6 branch characters'
                     />
                     <p className='text-xs text-gray-500 mt-1'>
-                      11-character IFSC (e.g., JAKA0BEMINA - Bank code + 0 +
-                      Branch code)
+                      11-character IFSC: Bank code (4 letters) + 0 + Branch code
+                      (6 chars) - e.g., JAKA0BEMINA
                     </p>
                   </div>
                 </div>
